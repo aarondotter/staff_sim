@@ -1,0 +1,230 @@
+import streamlit as st
+import simpy
+import random
+import pandas as pd
+import matplotlib.pyplot as plt
+
+
+# -----------------------------
+# Simulation Model
+# -----------------------------
+class FireDept:
+    def __init__(self, env, full_staff, min_staff, absence_prob):
+        self.env = env
+        self.full_staff = full_staff
+        self.min_staff = min_staff
+        self.absence_prob = absence_prob
+
+        self.staff = simpy.Container(env, init=full_staff, capacity=full_staff)
+
+        self.mutual_aid_calls = 0
+        self.total_calls = 0
+        self.delayed_calls = 0
+        self.total_wait_time = 0
+        self.overload_events = 0
+
+        # track daily staffing adjustments
+        self.current_absent = 0
+
+        env.process(self.staffing_manager())
+
+    def staffing_manager(self):
+        """Adjust staffing once per day based on absences"""
+        while True:
+            # return previously absent staff
+            if self.current_absent > 0:
+                yield self.staff.put(self.current_absent)
+                self.current_absent = 0
+
+            # determine new absences
+            absent = sum(1 for _ in range(self.full_staff) if random.random() < self.absence_prob)
+
+            # enforce minimum staffing
+            max_removable = self.full_staff - self.min_staff
+            absent = min(absent, max_removable)
+
+            # remove staff from availability
+            if absent > 0:
+                yield self.staff.get(absent)
+                self.current_absent = absent
+
+            # wait 1 day
+            yield self.env.timeout(1440)
+
+    def handle_call(self, staff_needed, duration):
+        self.total_calls += 1
+        arrival = self.env.now
+
+        # overload check
+        if self.staff.level < staff_needed:
+            self.overload_events += 1
+
+        wait_threshold = 5
+
+        if self.staff.level < staff_needed:
+            yield self.env.timeout(wait_threshold)
+
+        if self.staff.level < staff_needed:
+            self.mutual_aid_calls += 1
+            return
+
+        wait_time = self.env.now - arrival
+
+        if wait_time > 0:
+            self.delayed_calls += 1
+            self.total_wait_time += wait_time
+
+        yield self.staff.get(staff_needed)
+        yield self.env.timeout(duration)
+        yield self.staff.put(staff_needed)
+
+
+def generate_call(ems_fraction):
+    r = random.random()
+
+    if r < ems_fraction:
+        return 2, random.uniform(50, 70)
+    elif r < 0.99:
+        return random.randint(2, 6), random.uniform(50, 70)
+    else:
+        return random.randint(4, 6), random.uniform(150, 210)
+
+
+def call_generator(env, fd, calls_per_year, ems_fraction):
+    call_rate = calls_per_year / (365 * 1440)
+
+    while True:
+        yield env.timeout(random.expovariate(call_rate))
+        staff_needed, duration = generate_call(ems_fraction)
+        env.process(fd.handle_call(staff_needed, duration))
+
+
+def run_simulation(full_staff, min_staff, absence_prob, ems_fraction, calls_per_year, days=365):
+    env = simpy.Environment()
+    fd = FireDept(env, full_staff, min_staff, absence_prob)
+
+    env.process(call_generator(env, fd, calls_per_year, ems_fraction))
+    env.run(until=days * 1440)
+
+    avg_wait = (fd.total_wait_time / fd.delayed_calls) if fd.delayed_calls > 0 else 0
+
+    return {
+        "Total Calls": fd.total_calls,
+        "Mutual Aid Calls": fd.mutual_aid_calls,
+        "Mutual Aid %": (fd.mutual_aid_calls / fd.total_calls) * 100 if fd.total_calls > 0 else 0,
+        "Delayed Calls": fd.delayed_calls,
+        "Delayed %": (fd.delayed_calls / fd.total_calls) * 100 if fd.total_calls > 0 else 0,
+        "Avg Delay (min)": avg_wait,
+        "Overload Events": fd.overload_events,
+        "Overload Probability %": (fd.overload_events / fd.total_calls) * 100 if fd.total_calls > 0 else 0
+    }
+
+
+# -----------------------------
+# Streamlit UI
+# -----------------------------
+st.title("Hartford FD Staffing Model")
+
+st.sidebar.header("Simulation Controls")
+
+base_calls = st.sidebar.slider("Current Annual Call Volume", 2000, 6000, 3000, step=100)
+growth_rate = st.sidebar.slider("Annual Call Growth Rate (%)", 0, 15, 5)
+
+EMS_percentage = st.sidebar.slider("Percentage of EMS Calls", 50, 99, 75)
+
+absence_prob = st.sidebar.slider("Daily Absence Probability per Person", 0.0, 0.5, 0.1)
+
+iterations = st.sidebar.slider("Simulation Runs", 10, 100, 10)
+
+years = [0, 1, 2, 3, 4, 5]
+total_calls_per_year = [int(base_calls * (1 + growth_rate/100)**year) for year in years]
+staffing_options = [6, 7, 8]
+minimum_staffing={6:5, 7:5, 8:6}
+
+EMS_fraction = EMS_percentage*0.01
+
+# Run simulations
+if st.button("Run Simulation"):
+    all_results = []
+    
+    for staffing in staffing_options:
+        for year in years:
+            calls = int(base_calls * (1 + growth_rate/100) ** year)
+            
+            aggregate = {
+                "Total Calls": 0,
+                "Mutual Aid Calls": 0,
+                "Mutual Aid %": 0,
+                "Delayed Calls": 0,
+                "Delayed %": 0,
+                "Avg Delay (min)": 0,
+                "Overload Events": 0,
+                "Overload Probability %": 0
+            }
+
+            for _ in range(iterations):
+                sim_result = run_simulation(staffing, minimum_staffing[staffing], absence_prob, EMS_fraction, calls)
+                for key in aggregate:
+                    aggregate[key] += sim_result[key]
+
+            for key in aggregate:
+                aggregate[key] /= iterations
+
+            aggregate["Staffing"] = staffing
+            aggregate["Year"] = year
+            aggregate["Calls/Year"] = calls
+
+            all_results.append(aggregate)
+
+    df = pd.DataFrame(all_results)
+
+    #st.subheader("Simulation Results")
+    #xsst.dataframe(df)
+
+    st.subheader("Total Calls")
+    fig, ax = plt.subplots()
+    ax.plot(years, total_calls_per_year, 'o--')
+    ax.grid(axis='y')
+    ax.set_xlim(-0.5,5.5)
+    #ax.set_ylim(0,10)
+    ax.set_ylabel("Number of Calls")
+    ax.set_xlabel("Years from present")
+    st.pyplot(fig)
+
+    
+#    st.subheader("Mutual Aid % Over Time")
+#    st.scatter_chart(
+#        df.pivot(index="Year", columns="Staffing", values="Mutual Aid %"),
+#        x_label="Year",
+#        y_label="Mutual Aid %"
+#    )
+
+    #st.subheader("Delayed Calls % Over Time")
+    #st.line_chart(df.set_index("Year")["Delayed %"])
+
+    #st.subheader("Overload Probability (%)")
+    #st.line_chart(df.set_index("Year")["Overload Probability %"])
+
+    #st.subheader("Average Delay (minutes)")
+    #st.line_chart(df.set_index("Year")["Avg Delay (min)"])
+
+    st.subheader("Calls to Mutual Aid")
+    fig, ax = plt.subplots()
+    for s in staffing_options:
+        ax.plot(df[df['Staffing']==s]['Year'], df[df['Staffing']==s]['Mutual Aid %'], 'o--', label=str(s))
+    ax.legend(title="Per Shift",loc='upper left')
+    ax.grid(axis='y')
+    ax.set_xlim(-0.5,5.5)
+    #ax.set_ylim(0,10)
+    ax.set_ylabel("Mutual Aid Percentage")
+    ax.set_xlabel("Years from present")
+    st.pyplot(fig)
+
+    
+st.markdown("---")
+st.markdown("**How to interpret:**")
+#st.markdown("- Absences reduce available staffing daily but never below minimum")
+#st.markdown("- Overload Probability: Chance a call arrives when staffing is insufficient")
+st.markdown("- Mutual Aid: Calls our department cannot handle and must go to our mutual aid partners.")
+#st.markdown("- Delayed %: Calls that had to wait before response")
+#st.markdown("- Avg Delay: How long those delayed calls waited")
