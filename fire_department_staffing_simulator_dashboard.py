@@ -14,6 +14,7 @@ class FireDept:
         self.full_staff = full_staff
         self.min_staff = min_staff
         self.absence_prob = absence_prob
+        self.wait_threshold = wait_threshold
 
         self.staff = simpy.Container(env, init=full_staff, capacity=full_staff)
 
@@ -59,10 +60,8 @@ class FireDept:
         if self.staff.level < staff_needed:
             self.overload_events += 1
 
-        wait_threshold = 5
-
         if self.staff.level < staff_needed:
-            yield self.env.timeout(wait_threshold)
+            yield self.env.timeout(self.wait_threshold)
 
         if self.staff.level < staff_needed:
             self.mutual_aid_calls += 1
@@ -99,9 +98,9 @@ def call_generator(env, fd, calls_per_year, ems_fraction):
         env.process(fd.handle_call(staff_needed, duration))
 
 
-def run_simulation(full_staff, min_staff, absence_prob, ems_fraction, calls_per_year, days=365):
+def run_simulation(full_staff, min_staff, absence_prob, ems_fraction, wait_threshold, calls_per_year, days=365):
     env = simpy.Environment()
-    fd = FireDept(env, full_staff, min_staff, absence_prob)
+    fd = FireDept(env, full_staff, min_staff, absence_prob, wait_threshold)
 
     env.process(call_generator(env, fd, calls_per_year, ems_fraction))
     env.run(until=days * 1440)
@@ -134,13 +133,12 @@ EMS_percentage = st.sidebar.slider("Percentage of EMS Calls", 50, 99, 75)
 
 absence_prob = st.sidebar.slider("Daily Absence Probability per Person", 0.0, 0.5, 0.1)
 
+wait_threshold = st.slidebar.slider("Callback Threshold (minutes):", 0, 30, 5)
+
 iterations = st.sidebar.slider("Simulation Runs", 10, 100, 10)
 
 years = [0, 1, 2, 3, 4, 5]
 total_calls_per_year = [int(base_calls * (1 + growth_rate/100)**year) for year in years]
-#test
-#total_calls_per_year = [int(66*(year+22) + 1556) for year in years]
-#test
 staffing_options = [6, 7, 8]
 minimum_staffing={6:5, 7:5, 8:6}
 
@@ -166,7 +164,7 @@ if st.button("Run Simulation"):
             }
 
             for _ in range(iterations):
-                sim_result = run_simulation(staffing, minimum_staffing[staffing], absence_prob, EMS_fraction, calls)
+                sim_result = run_simulation(staffing, minimum_staffing[staffing], absence_prob, EMS_fraction, wait_threshold, calls)
                 for key in aggregate:
                     aggregate[key] += sim_result[key]
 
