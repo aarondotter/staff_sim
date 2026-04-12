@@ -133,7 +133,7 @@ EMS_percentage = st.sidebar.slider("Percentage of EMS Calls", 50, 99, 75)
 
 absence_prob = st.sidebar.slider("Daily Absence Probability per Person", 0.0, 0.5, 0.1)
 
-wait_threshold = st.slidebar.slider("Callback Threshold (minutes):", 0, 30, 5)
+wait_threshold = st.sidebar.slider("Callback Threshold (minutes):", 0, 30, 5)
 
 iterations = st.sidebar.slider("Simulation Runs", 10, 100, 10)
 
