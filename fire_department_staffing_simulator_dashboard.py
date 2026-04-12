@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # Simulation Model
 # -----------------------------
 class FireDept:
-    def __init__(self, env, full_staff, min_staff, absence_prob):
+    def __init__(self, env, full_staff, min_staff, absence_prob, wait_threshold):
         self.env = env
         self.full_staff = full_staff
         self.min_staff = min_staff
