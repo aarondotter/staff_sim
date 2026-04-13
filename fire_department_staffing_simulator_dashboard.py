@@ -200,14 +200,14 @@ if st.button("Run Simulation"):
 #        y_label="Mutual Aid %"
 #    )
 
-    #st.subheader("Delayed Calls % Over Time")
-    #st.line_chart(df.set_index("Year")["Delayed %"])
+    st.subheader("Delayed Calls % Over Time")
+    st.line_chart(df.set_index("Year")["Delayed %"])
 
     #st.subheader("Overload Probability (%)")
     #st.line_chart(df.set_index("Year")["Overload Probability %"])
 
-    #st.subheader("Average Delay (minutes)")
-    #st.line_chart(df.set_index("Year")["Avg Delay (min)"])
+    st.subheader("Average Delay (minutes)")
+    st.line_chart(df.set_index("Year")["Avg Delay (min)"])
 
     st.subheader("Calls to Mutual Aid")
     fig, ax = plt.subplots()
@@ -227,5 +227,6 @@ st.markdown("**How to interpret:**")
 #st.markdown("- Absences reduce available staffing daily but never below minimum")
 #st.markdown("- Overload Probability: Chance a call arrives when staffing is insufficient")
 st.markdown("- Mutual Aid: Calls our department cannot handle and must go to our mutual aid partners.")
+st.markdown("- For full staffing of 6, minimum is 5; full 7 minimum is 5; full 8 minimum is 6.")
 #st.markdown("- Delayed %: Calls that had to wait before response")
 #st.markdown("- Avg Delay: How long those delayed calls waited")
