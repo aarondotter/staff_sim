@@ -56,27 +56,33 @@ class FireDept:
         self.total_calls += 1
         arrival = self.env.now
 
-        # overload check
-        if self.staff.level < staff_needed:
-            self.overload_events += 1
+        #magic
+        result = self.staff.get(staff_needed)
+        yield request | self.env.timeout(self.wait_threshold)
 
-        if self.staff.level < staff_needed:
-            yield self.env.timeout(self.wait_threshold)
+        used_staff = 0
 
-        if self.staff.level < staff_needed:
+        if request in result:
+            #good
+            wait_time = self.env.now - arrival
+            used_staff = staff_needed
+
+        else:
+            #bad
             self.mutual_aid_calls += 1
             return
-
-        wait_time = self.env.now - arrival
 
         if wait_time > 0:
             self.delayed_calls += 1
             self.total_wait_time += wait_time
 
-        yield self.staff.get(staff_needed)
-        yield self.env.timeout(duration)
-        yield self.staff.put(staff_needed)
+        if self.staff.level < staff_needed:
+            self.overload_events += 1
 
+        yield self.env.timeout(duration)
+
+        yield self.staff.put(used_staff)
+            
 
 def generate_call(ems_fraction):
     r = random.random()
