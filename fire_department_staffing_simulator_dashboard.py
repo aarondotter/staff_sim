@@ -82,9 +82,9 @@ def generate_call(ems_fraction):
     r = random.random()
 
     if r < ems_fraction:
-        return 2, random.uniform(50, 70)
+        return 2, random.uniform(30, 60)
     elif r < 0.99:
-        return random.randint(2, 6), random.uniform(50, 70)
+        return random.randint(2, 4), random.uniform(40, 60)
     else:
         return random.randint(4, 6), random.uniform(150, 210)
 
