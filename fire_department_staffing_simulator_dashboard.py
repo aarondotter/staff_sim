@@ -262,7 +262,7 @@ st.markdown("""
 | Full | Minimum |
 |------|---------|
 | 6    | 5       |
-| 7    | 5       |
+| 7    | 6       |
 | 8    | 6       |
 """)
 st.markdown("- Absences reduce staffing daily but never below minimum.")
