@@ -172,7 +172,7 @@ EMS_percentage = st.sidebar.slider("Percentage of EMS Calls", 50, 99, 70)
 
 absence_prob = st.sidebar.slider("Daily Absence Probability per Person", 0.0, 0.5, 0.08)
 
-wait_threshold = st.sidebar.slider("Coverage Threshold (minutes):", 0, 45, 30)
+wait_threshold = 30 #st.sidebar.slider("Coverage Threshold (minutes):", 0, 45, 30)
 
 iterations = st.sidebar.slider("Simulation Runs", 10, 100, 33)
 
