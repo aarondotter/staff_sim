@@ -179,7 +179,7 @@ iterations = st.sidebar.slider("Simulation Runs", 10, 100, 33)
 years = [0, 1, 2, 3, 4, 5]
 total_calls_per_year = [int(base_calls * (1 + growth_rate/100)**year) for year in years]
 staffing_options = [6, 7, 8]
-minimum_staffing={6:5, 7:5, 8:6}
+minimum_staffing={6:5, 7:6, 8:6}
 
 EMS_fraction = EMS_percentage*0.01
 
